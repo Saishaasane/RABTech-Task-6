@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flowline — Project & Task Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #EDEFF2; --panel: #FFFFFF; --ink: #1C2230; --muted: #5B6472;
+    --line: #D7DBE1; --accent: #2F6F63; --accent-ink: #FFFFFF;
+    --warn: #C97A3B; --todo: #C9CDD3; --doing: #C97A3B; --done: #2F6F63;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171A21; --panel: #1F232C; --ink: #EAEAEA; --muted: #97A0AC; --line: #333844;
+    }
+  }
+  :root[data-theme="dark"] { --bg: #171A21; --panel: #1F232C; --ink: #EAEAEA; --muted: #97A0AC; --line: #333844; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); height: 100%; }
+  * { box-sizing: border-box; }
+  body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); font-family: 'Inter', sans-serif; }
+  h1, h2, h3, .serif { font-family: 'Source Serif 4', serif; font-weight: 600; }
+  button { font-family: inherit; cursor: pointer; }
+  input, select, textarea { font-family: inherit; }
+
+  /* --- Auth screen --- */
+  #auth { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .auth-card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 36px; width: 100%; max-width: 380px; }
+  .auth-card h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .auth-card p.sub { color: var(--muted); margin: 0 0 24px; font-size: 0.92rem; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 5px; }
+  .field input { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); font-size: 0.95rem; }
+  .btn-primary { width: 100%; padding: 10px; background: var(--accent); color: var(--accent-ink); border: none; border-radius: 4px; font-size: 0.95rem; font-weight: 500; margin-top: 6px; }
+  .btn-primary:hover { opacity: 0.92; }
+  .switch { text-align: center; margin-top: 16px; font-size: 0.88rem; color: var(--muted); }
+  .switch a { color: var(--accent); cursor: pointer; text-decoration: none; }
+  .err { color: var(--warn); font-size: 0.85rem; margin: 0 0 12px; min-height: 1em; }
+
+  /* --- App shell --- */
+  #app { display: none; min-height: 100vh; }
+  .shell { display: flex; height: 100vh; }
+  .sidebar { width: 240px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--line); padding: 20px 16px; display: flex; flex-direction: column; }
+  .brand { font-size: 1.2rem; margin: 0 0 22px; }
+  .proj-list { flex: 1; overflow-y: auto; }
+  .proj-item { padding: 9px 10px; border-radius: 4px; margin-bottom: 3px; font-size: 0.9rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .proj-item:hover { background: var(--bg); }
+  .proj-item.active { background: var(--accent); color: var(--accent-ink); }
+  .proj-item .del { opacity: 0.55; font-size: 0.8rem; padding: 2px 6px; }
+  .proj-item .del:hover { opacity: 1; }
+  .new-proj { display: flex; gap: 6px; margin-top: 10px; }
+  .new-proj input { flex: 1; padding: 7px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); font-size: 0.85rem; }
+  .new-proj button { padding: 7px 10px; border: none; border-radius: 4px; background: var(--accent); color: #fff; font-size: 0.85rem; }
+  .logout { margin-top: 14px; border: 1px solid var(--line); background: none; color: var(--muted); padding: 8px; border-radius: 4px; font-size: 0.85rem; }
+
+  .main { flex: 1; overflow-y: auto; padding: 28px 32px; }
+  .main h2 { margin: 0 0 4px; font-size: 1.5rem; }
+  .main p.hint { color: var(--muted); margin: 0 0 22px; font-size: 0.9rem; }
+  .add-task { display: flex; gap: 8px; margin-bottom: 24px; max-width: 560px; }
+  .add-task input { flex: 1; padding: 9px 11px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
+  .add-task button { padding: 9px 16px; border: none; border-radius: 4px; background: var(--accent); color: #fff; font-weight: 500; }
+
+  .board { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 18px; }
+  .col { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; min-height: 120px; }
+  .col h3 { font-size: 0.95rem; margin: 0 0 12px; display: flex; align-items: center; gap: 7px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .card { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 10px 11px; margin-bottom: 9px; }
+  .card .t { font-size: 0.9rem; margin: 0 0 8px; word-break: break-word; }
+  .card-actions { display: flex; gap: 6px; align-items: center; }
+  .card-actions select { flex: 1; padding: 5px 6px; font-size: 0.78rem; border: 1px solid var(--line); border-radius: 3px; background: var(--panel); color: var(--ink); }
+  .card-actions button { border: none; background: none; color: var(--muted); font-size: 0.85rem; padding: 4px 6px; }
+  .card-actions button:hover { color: var(--warn); }
+  .empty { color: var(--muted); font-size: 0.85rem; text-align: center; padding: 40px 20px; }
+
+  @media (max-width: 720px) {
+    .shell { flex-direction: column; }
+    .sidebar { width: 100%; height: auto; flex-direction: row; flex-wrap: wrap; border-right: none; border-bottom: 1px solid var(--line); }
+    .proj-list { display: flex; gap: 6px; flex: none; width: 100%; order: 3; }
+    .board { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div id="auth">
+  <div class="auth-card">
+    <h1 class="serif">Flowline</h1>
+    <p class="sub" id="authSub">Sign in to your workspace</p>
+    <p class="err" id="authErr"></p>
+    <div class="field" id="nameField" style="display:none">
+      <label>Name</label>
+      <input id="nameInput" type="text" autocomplete="name">
+    </div>
+    <div class="field">
+      <label>Email</label>
+      <input id="emailInput" type="email" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input id="passInput" type="password" autocomplete="current-password">
+    </div>
+    <button class="btn-primary" id="authBtn">Sign in</button>
+    <p class="switch" id="switchText">New here? <a id="switchLink">Create an account</a></p>
+  </div>
+</div>
+
+<div id="app">
+  <div class="shell">
+    <div class="sidebar">
+      <h2 class="brand serif">Flowline</h2>
+      <div class="proj-list" id="projList"></div>
+      <div class="new-proj">
+        <input id="newProjInput" placeholder="New project">
+        <button id="newProjBtn">Add</button>
+      </div>
+      <button class="logout" id="logoutBtn">Sign out</button>
+    </div>
+    <div class="main">
+      <div id="boardArea"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DB_KEY = 'flowline_db_v1';
+const SESSION_KEY = 'flowline_session_v1';
+
+function loadDB() {
+  try { return JSON.parse(localStorage.getItem(DB_KEY)) || { users: {} }; }
+  catch (e) { return { users: {} }; }
+}
+function saveDB(db) { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
+function getSession() { try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch (e) { return null; } }
+function setSession(email) { localStorage.setItem(SESSION_KEY, JSON.stringify({ email })); }
+function clearSession() { localStorage.removeItem(SESSION_KEY); }
+// Simulated auth only — NOT secure storage, for demo/local use.
+function simpleHash(s) { let h = 0; for (let i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))|0;} return String(h); }
+
+let db = loadDB();
+let mode = 'login';
+let activeProjectId = null;
+
+const authSub = document.getElementById('authSub');
+const authErr = document.getElementById('authErr');
+const nameField = document.getElementById('nameField');
+const switchText = document.getElementById('switchText');
+const switchLink = document.getElementById('switchLink');
+
+function setMode(m) {
+  mode = m; authErr.textContent = '';
+  if (m === 'login') {
+    authSub.textContent = 'Sign in to your workspace';
+    nameField.style.display = 'none';
+    document.getElementById('authBtn').textContent = 'Sign in';
+    switchText.innerHTML = 'New here? <a id="switchLink">Create an account</a>';
+  } else {
+    authSub.textContent = 'Create your workspace';
+    nameField.style.display = 'block';
+    document.getElementById('authBtn').textContent = 'Create account';
+    switchText.innerHTML = 'Already have an account? <a id="switchLink">Sign in</a>';
+  }
+  document.getElementById('switchLink').onclick = () => setMode(mode === 'login' ? 'signup' : 'login');
+}
+switchLink.onclick = () => setMode('signup');
+
+document.getElementById('authBtn').onclick = () => {
+  const email = document.getElementById('emailInput').value.trim().toLowerCase();
+  const pass = document.getElementById('passInput').value;
+  const name = document.getElementById('nameInput').value.trim();
+  authErr.textContent = '';
+  if (!email || !pass) { authErr.textContent = 'Enter an email and password.'; return; }
+
+  if (mode === 'signup') {
+    if (db.users[email]) { authErr.textContent = 'An account with that email already exists.'; return; }
+    db.users[email] = { name: name || email.split('@')[0], pass: simpleHash(pass), projects: {} };
+    saveDB(db);
+    setSession(email);
+    enterApp(email);
+  } else {
+    const u = db.users[email];
+    if (!u || u.pass !== simpleHash(pass)) { authErr.textContent = 'Incorrect email or password.'; return; }
+    setSession(email);
+    enterApp(email);
+  }
+};
+
+document.getElementById('logoutBtn').onclick = () => {
+  clearSession();
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('auth').style.display = 'flex';
+  document.getElementById('emailInput').value = '';
+  document.getElementById('passInput').value = '';
+};
+
+function enterApp(email) {
+  document.getElementById('auth').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  activeProjectId = null;
+  renderProjects(email);
+  renderBoard(email);
+}
+
+function currentUser(email) { return db.users[email]; }
+
+document.getElementById('newProjBtn').onclick = () => {
+  const session = getSession(); if (!session) return;
+  const input = document.getElementById('newProjInput');
+  const name = input.value.trim();
+  if (!name) return;
+  const u = currentUser(session.email);
+  const id = 'p' + Date.now();
+  u.projects[id] = { name, tasks: {} };
+  saveDB(db);
+  input.value = '';
+  activeProjectId = id;
+  renderProjects(session.email);
+  renderBoard(session.email);
+};
+
+function renderProjects(email) {
+  const u = currentUser(email);
+  const list = document.getElementById('projList');
+  const ids = Object.keys(u.projects);
+  if (!activeProjectId && ids.length) activeProjectId = ids[0];
+  list.innerHTML = '';
+  ids.forEach(id => {
+    const p = u.projects[id];
+    const el = document.createElement('div');
+    el.className = 'proj-item' + (id === activeProjectId ? ' active' : '');
+    el.innerHTML = `<span>${escapeHtml(p.name)}</span><span class="del" title="Delete project">✕</span>`;
+    el.querySelector('span:first-child').onclick = () => { activeProjectId = id; renderProjects(email); renderBoard(email); };
+    el.querySelector('.del').onclick = (e) => {
+      e.stopPropagation();
+      if (confirm(`Delete project "${p.name}" and all its tasks?`)) {
+        delete u.projects[id]; saveDB(db);
+        if (activeProjectId === id) activeProjectId = null;
+        renderProjects(email); renderBoard(email);
+      }
+    };
+    list.appendChild(el);
+  });
+}
+
+function renderBoard(email) {
+  const area = document.getElementById('boardArea');
+  const u = currentUser(email);
+  if (!activeProjectId || !u.projects[activeProjectId]) {
+    area.innerHTML = `<div class="empty">Add a project on the left to start tracking tasks.</div>`;
+    return;
+  }
+  const proj = u.projects[activeProjectId];
+  const cols = [
+    { key: 'todo', label: 'To do', color: 'var(--todo)' },
+    { key: 'doing', label: 'In progress', color: 'var(--doing)' },
+    { key: 'done', label: 'Done', color: 'var(--done)' }
+  ];
+  const taskIds = Object.keys(proj.tasks);
+
+  area.innerHTML = `
+    <h2 class="serif">${escapeHtml(proj.name)}</h2>
+    <p class="hint">${taskIds.length} task${taskIds.length === 1 ? '' : 's'} in this project</p>
+    <div class="add-task">
+      <input id="taskInput" placeholder="Describe a task">
+      <button id="addTaskBtn">Add task</button>
+    </div>
+    <div class="board">
+      ${cols.map(c => `
+        <div class="col">
+          <h3><span class="dot" style="background:${c.color}"></span>${c.label}</h3>
+          <div id="col-${c.key}"></div>
+        </div>`).join('')}
+    </div>
+  `;
+
+  cols.forEach(c => {
+    const holder = document.getElementById(`col-${c.key}`);
+    const items = taskIds.filter(tid => proj.tasks[tid].status === c.key);
+    if (!items.length) { holder.innerHTML = `<p style="color:var(--muted);font-size:0.82rem;margin:0">Nothing here yet.</p>`; return; }
+    items.forEach(tid => {
+      const t = proj.tasks[tid];
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <p class="t">${escapeHtml(t.title)}</p>
+        <div class="card-actions">
+          <select>
+            <option value="todo" ${t.status==='todo'?'selected':''}>To do</option>
+            <option value="doing" ${t.status==='doing'?'selected':''}>In progress</option>
+            <option value="done" ${t.status==='done'?'selected':''}>Done</option>
+          </select>
+          <button title="Delete task">✕</button>
+        </div>`;
+      card.querySelector('select').onchange = (e) => {
+        proj.tasks[tid].status = e.target.value; saveDB(db); renderBoard(email);
+      };
+      card.querySelector('button').onclick = () => {
+        delete proj.tasks[tid]; saveDB(db); renderBoard(email);
+      };
+      holder.appendChild(card);
+    });
+  });
+
+  document.getElementById('addTaskBtn').onclick = () => {
+    const input = document.getElementById('taskInput');
+    const title = input.value.trim();
+    if (!title) return;
+    const tid = 't' + Date.now();
+    proj.tasks[tid] = { title, status: 'todo' };
+    saveDB(db);
+    renderBoard(email);
+  };
+  document.getElementById('taskInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('addTaskBtn').click();
+  });
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Boot: resume session if present
+(function boot() {
+  setMode('login');
+  const session = getSession();
+  if (session && db.users[session.email]) enterApp(session.email);
+})();
+</script>
+</body>
+</html>
